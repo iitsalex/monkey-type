@@ -449,6 +449,10 @@ function countChars() {
   }
 }
 
+function roundTo2(num){
+  return Math.round((num + Number.EPSILON) * 100) / 100
+}
+
 function calculateStats() {
   if (config.mode == "words" && config.difficulty == "normal") {
     if (inputHistory.length != wordsList.length) return;
@@ -456,10 +460,11 @@ function calculateStats() {
   let chars = countChars();
 
   let testNow = Date.now();
-  let testSeconds = (testNow - testStart) / 1000;
-  let wpm = Math.round(((chars.correctWordChars + chars.spaces) * (60 / testSeconds)) / 5);
-  let wpmraw = Math.round(((chars.allCorrectChars + chars.spaces + chars.incorrectChars + chars.extraChars) * (60/testSeconds))/5);
-  let acc = Math.floor((accuracyStats.correct / (accuracyStats.correct + accuracyStats.incorrect)) * 100);
+  let testSeconds = roundTo2((testNow - testStart) / 1000);
+  console.log(testSeconds);
+  let wpm = roundTo2(((chars.correctWordChars + chars.spaces) * (60 / testSeconds)) / 5);
+  let wpmraw = roundTo2(((chars.allCorrectChars + chars.spaces + chars.incorrectChars + chars.extraChars) * (60/testSeconds))/5);
+  let acc = roundTo2((accuracyStats.correct / (accuracyStats.correct + accuracyStats.incorrect)) * 100);
   return {
     wpm: wpm,
     wpmRaw: wpmraw,
@@ -1072,6 +1077,9 @@ $(document).on("click", "#top .config .mode .button", (e) => {
 
 $(document).on("click", "#top #menu .button", (e) => {
   if($(e.currentTarget).hasClass('discord')) return;
+  if($(e.currentTarget).hasClass('leaderboards')){
+    showLeaderboards();
+  }
   href = $(e.currentTarget).attr('href');
   changePage(href.replace('/', ''));
 })
@@ -1333,6 +1341,9 @@ if (firebase.app().options.projectId === "monkey-type-dev-67af4") {
 }
 
 if (window.location.hostname === "localhost") {
+  window.onerror = function(error) {
+    this.showNotification(error,3000);
+  };
   $("#top .logo .top").text("localhost");
   $("head title").text($("head title").text() + " (localhost)");
 

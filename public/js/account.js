@@ -124,6 +124,7 @@ firebase.auth().onAuthStateChanged(function(user) {
     var isAnonymous = user.isAnonymous;
     var uid = user.uid;
     var providerData = user.providerData;
+    $("#top #menu .account .text ").text(displayName);
     showNotification('Signed in', 2000);
     $(".pageLogin .preloader").addClass('hidden');
     updateAccountLoginButton();
