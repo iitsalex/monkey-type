@@ -1,3 +1,7 @@
+# contributions
+Hello! This is my branch for monkey-type where I would like to try and help development. Listed below are some things I worked on.
+- option to hide timer bar when doing a timed test
+
 # about
 Monkey-type is a minimalistic typing test, featuring many test modes, an account system to save your typing speed history and user configurable features like themes, a smooth caret and more.
 
