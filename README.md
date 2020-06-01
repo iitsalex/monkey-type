@@ -1,5 +1,5 @@
 # contributions
-Hello! This is my branch for monkey-type where I would like to try and help development. Listed below are some things I worked on.
+Hello! This is my branch for monkey-type where I try to help development. Listed below are some things I worked on.
 - option to hide timer bar when doing a timed test
 
 # about
