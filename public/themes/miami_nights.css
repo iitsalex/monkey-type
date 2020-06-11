@@ -3,7 +3,9 @@
     --main-color: #e4609b;
     --caret-color: #e4609b;
     --sub-color: #47bac0;
-    --text-color: #e4609b;
+    --text-color: #fff;
     --error-color: #fff591;
     --error-extra-color: #b6af68;
+    --extra-error-color: #fff591;
+    --extra-error-extra-color: #b6af68;
 }

@@ -9,6 +9,7 @@ let testStart, testEnd;
 let wpmHistory = [];
 let rawHistory = [];
 let restartCount = 0;
+let incompleteTestSeconds = 0;
 let currentTestLine = 0;
 let pageTransition = false;
 let keypressPerSecond = [];
@@ -20,6 +21,8 @@ let resultVisible = false;
 let activeWordTopBeforeJump = 0;
 let activeWordTop = 0;
 let activeWordJumped = false;
+let sameWordset = false;
+let activeTags = [];
 
 let accuracyStats = {
   correct: 0,
@@ -27,6 +30,12 @@ let accuracyStats = {
 }
 
 let customText = "The quick brown fox jumps over the lazy dog";
+
+const testCompleted = firebase.functions().httpsCallable('testCompleted');
+const addTag = firebase.functions().httpsCallable('addTag');
+const editTag = firebase.functions().httpsCallable('editTag');
+const removeTag = firebase.functions().httpsCallable('removeTag');
+
 
 function showNotification(text, time) {
   let noti = $(".notification");
@@ -45,15 +54,35 @@ function showNotification(text, time) {
   });
 }
 
-function test() {
-  $("#resultScreenshot").removeClass("hidden");
-  html2canvas($("#resultScreenshot"), {
-    onclone: function(clonedDoc) {
-      clonedDoc.getElementById("resultScreenshot").style.display = "block";
-    }
-  }).then((canvas) => {
-    $("#resultScreenshot").removeClass("hidden");
-    document.body.appendChild(canvas);
+function copyResultToClipboard() {
+  let src = $('#middle');
+  var sourceX = src.position().left;/*X position from div#target*/
+  var sourceY = src.position().top;/*Y position from div#target*/
+  var sourceWidth = src.width();/*clientWidth/offsetWidth from div#target*/
+  var sourceHeight = src.height();/*clientHeight/offsetHeight from div#target*/
+
+  let bgColor = getComputedStyle(document.body).getPropertyValue('--bg-color').replace(' ', '');
+
+  html2canvas(document.body,{
+    backgroundColor: bgColor,
+    height: sourceHeight + 50,
+    width: sourceWidth + 50,
+    x: sourceX - 25,
+    y: sourceY - 25
+  }).then(function(canvas) {
+    // document.body.appendChild(canvas);
+    canvas.toBlob(function(blob) {
+      navigator.clipboard
+        .write([
+          new ClipboardItem(
+            Object.defineProperty({}, blob.type, {
+              value: blob,
+              enumerable: true
+            })
+          )
+        ])
+    });
+    showNotification('Copied to clipboard',1000);
   });
 }
 
@@ -72,6 +101,47 @@ function getReleasesFromGitHub() {
         `);
       }
     })
+  })
+}
+
+function verifyUsername(){
+//   test = firebase.functions().httpsCallable('moveResults')
+// test2 = firebase.functions().httpsCallable('getNames')
+// test3 = firebase.functions().httpsCallable('checkNameAvailability')
+  const check = firebase.functions().httpsCallable('checkIfNeedsToChangeName')
+  check({uid: firebase.auth().currentUser.uid}).then(data => {
+    if(data.data === 1){
+      $('.nameChangeMessage').slideDown();
+    }else if(data.data === 2){
+      $('.nameChangeMessage').slideDown();
+    }
+  })
+
+  $('.nameChangeMessage').click(e => {
+    alert(`Im currently preparing the system to be ready for leaderboards and other awesome features - it looks like you need to change your display name.
+    
+    It either contains special characters, or your display name is the same as someone elses and your account was made later.
+    
+    Sorry for this inconvenience.
+    `);
+    let newName = prompt('Please provide a new username - you can use lowercase and uppercase characters, numbers and one of these special characters ( . _ - ). The new name cannot be longer than 12 characters.',firebase.auth().currentUser.displayName);
+    
+    cn = firebase.functions().httpsCallable('changeName');
+    cn({uid:firebase.auth().currentUser.uid,name:newName}).then(d => {
+      if(d.data === 1){
+        //all good
+        alert('Thanks! All good.');
+        location.reload();
+        $('.nameChangeMessage').slideUp();
+      }else if(d.data === 0){
+        //invalid or unavailable
+        alert('Name invalid or taken. Try again.');
+      }else if(d.data === -1){
+        //error
+        alert('Unknown error. Contact Miodec on Discord.');
+      }
+    });
+    
   })
 }
 
@@ -123,7 +193,7 @@ function initWords() {
 
   if (config.mode == "time" || config.mode == "words") {
 
-    let wordsBound = config.mode == "time" ? 50 : config.words;
+    let wordsBound = config.mode == "time" ? 60 : config.words;
     for (let i = 0; i < wordsBound; i++) {
       randomWord = language[Math.floor(Math.random() * language.length)];
       previousWord = wordsList[i - 1];
@@ -143,6 +213,35 @@ function initWords() {
     }
   }
   showWords();
+}
+
+function emulateLayout(event){
+  if (config.layout == "default")
+    return event;
+  const qwertyMasterLayout = {"Backquote":"`~","Digit1":"1!","Digit2":"2@","Digit3":"3#","Digit4":"4$","Digit5":"5%","Digit6":"6^","Digit7":"7&","Digit8":"8*","Digit9":"9(","Digit0":"0)","Minus":"-_","Equal":"=+","KeyQ":"qQ","KeyW":"wW","KeyE":"eE","KeyR":"rR","KeyT":"tT","KeyY":"yY","KeyU":"uU","KeyI":"iI","KeyO":"oO","KeyP":"pP","BracketLeft":"[{","BracketRight":"]}","KeyA":"aA","KeyS":"sS","KeyD":"dD","KeyF":"fF","KeyG":"gG","KeyH":"hH","KeyJ":"jJ","KeyK":"kK","KeyL":"lL","Semicolon":";:","Quote":"'\"","Backslash":"\\|","KeyZ":"zZ","KeyX":"xX","KeyC":"cC","KeyV":"vV","KeyB":"bB","KeyN":"nN","KeyM":"mM","Comma":",<","Period":".>","Slash":"/?","Space":"  "}
+  let layoutMap = layouts[config.layout];
+  let qwertyMap = layouts["qwerty"];
+
+  let qwertyKey = qwertyMasterLayout[event.code];
+  let mapIndex;
+  let newKey;
+  let shift = event.shiftKey ? 1 : 0;
+  for (let i = 0; i < qwertyMap.length; i++) {
+    const key = qwertyMap[i];
+    let keyIndex = key.indexOf(qwertyKey);
+    if (keyIndex != -1){
+      mapIndex = i;
+    }
+  }
+  if (!shift && /[A-Z]/gm.test(event.key)){
+    shift = 1;
+  }
+  newKey = layoutMap[mapIndex][shift];
+  event.keyCode = newKey.charCodeAt(0);
+  event.charCode = newKey.charCodeAt(0);
+  event.which = newKey.charCodeAt(0);
+  event.key = newKey;
+  return event;
 }
 
 function punctuateWord(previousWord, currentWord, index, maxindex){
@@ -259,6 +358,9 @@ function compareInput(wrdIndex,input,showError) {
     } else {
       if(config.difficulty == "master"){
         if(!resultVisible) showResult(true);
+        let testNow = Date.now();
+        let testSeconds = roundTo2((testNow - testStart) / 1000);
+        incompleteTestSeconds += testSeconds;
         restartCount++;
       }
       if(!showError){
@@ -487,12 +589,13 @@ function hideCrown() {
 }
 
 function showCrown() {
-  $("#result .stats .wpm .crownWrapper").delay(275).animate({
+  $("#result .stats .wpm .crownWrapper").animate({
     opacity: 1
   }, 250,"easeOutCubic");
 }
 
 function showResult(difficultyFailed = false) {
+  resultVisible=true;
   testEnd = Date.now();
   testActive = false;
   setFocus(false);
@@ -520,7 +623,7 @@ function showResult(difficultyFailed = false) {
   $("#result .stats .time .bottom").text(testtime+'s');
 
   setTimeout(function() {
-    $("#showWordHistoryButton").removeClass('hidden').css('opacity',1);
+    $("#resultExtraButtons").removeClass('hidden').css('opacity',1);
   }, 125);
   
 
@@ -535,10 +638,14 @@ function showResult(difficultyFailed = false) {
     // $("#result .stats .time .bottom").text(roundedToFixed(stats.time,1)+'s');
   }
   
+  let pbVal = 0;
+
   if(difficultyFailed){
-    showNotification("Test failed",3000);
+    showNotification("Test failed",2000);
   }else if(afkDetected){
-    showNotification("Test invalid - AFK detected",3000);
+    showNotification("Test invalid - AFK detected",2000);
+  }else if(sameWordset){
+    showNotification("Test invalid - repeated",2000);
   }else{
     let completedEvent = {
       wpm: stats.wpm,
@@ -552,31 +659,69 @@ function showResult(difficultyFailed = false) {
       timestamp: Date.now(),
       language: config.language,
       restartCount: restartCount,
+      incompleteTestSeconds: incompleteTestSeconds,
       difficulty: config.difficulty,
       testDuration: testtime,
       blindMode: config.blindMode,
-      theme: config.theme
+      theme: config.theme,
+      tags: activeTags
     };
     if(config.difficulty == "normal" || ((config.difficulty == "master" || config.difficulty == "expert") && !difficultyFailed)){
+      // console.log(incompleteTestSeconds);
+      // console.log(restartCount);
       restartCount = 0;
+      incompleteTestSeconds = 0;
     }
     if (stats.wpm > 0 && stats.wpm < 350 && stats.acc > 50 && stats.acc <= 100) {
       if (firebase.auth().currentUser != null) {
-        db_getUserHighestWpm(config.mode, mode2, config.punctuation, config.language, config.difficulty).then(data => {
-          // console.log(`highest wpm for this mode is ${data}, current is ${stats.wpm}`);
-          if (data < stats.wpm) {
-            hideCrown();
-            showCrown();
+        completedEvent.uid = firebase.auth().currentUser.uid;
+
+        //check local pb
+        let localPb = false;
+        let dontShowCrown = false;
+        db_getLocalPB(config.mode,mode2,config.punctuation,config.language,config.difficulty).then(d => {
+          db_getUserHighestWpm(config.mode,mode2,config.punctuation,config.language,config.difficulty).then(d2 => {
+            if(d < stats.wpm && stats.wpm < d2){
+              dontShowCrown = true;
+            }
+            if(d < stats.wpm){
+              //new pb based on local
+              if(!dontShowCrown){
+                hideCrown();
+                showCrown();
+              }
+              localPb = true;
+            }
+          })
+        })
+        
+        accountIconLoading(true);
+        testCompleted({uid:firebase.auth().currentUser.uid,obj:completedEvent}).then(e => {
+          accountIconLoading(false);
+          if(e.data === -1){
+            showNotification('Could not save result',3000);
+          }else if(e.data === 1 || e.data === 2){
+            dbSnapshot.results.unshift(completedEvent);
+            try{
+              firebase.analytics().logEvent('testCompleted', completedEvent);
+            }catch(e){
+              console.log("Analytics unavailable");
+            }
+            if(e.data === 2){
+              //new pb
+              if(!localPb){
+                  showNotification('Local PB data is out of sync! Refresh the page to resync it or contact Miodec on Discord.',15000);
+              }
+              db_saveLocalPB(config.mode,mode2,config.punctuation,config.language,config.difficulty,stats.wpm);
+            }else{
+              if(localPb){
+                showNotification('Local PB data is out of sync! Refresh the page to resync it or contact Miodec on Discord.',15000);
+              }
+            }
+
           }
-          completedEvent.uid = firebase.auth().currentUser.uid;
-          try{
-            firebase.analytics().logEvent('testCompleted', completedEvent);
-          }catch(e){
-            console.log("Analytics unavailable");
-          }
-          db_testCompleted(completedEvent);
-          dbSnapshot.unshift(completedEvent);
-        });
+        })
+
         $("#result .loginTip").addClass('hidden');
       } else {
         try{
@@ -637,6 +782,9 @@ function showResult(difficultyFailed = false) {
   if(testInvalid){
     otherText += "<br>invalid"
   }
+  if(sameWordset){
+    otherText += "<br>repeated"
+  }
 
   if(otherText == ""){
     $("#result .stats .info").addClass('hidden');
@@ -646,6 +794,23 @@ function showResult(difficultyFailed = false) {
     $("#result .stats .info .bottom").html(otherText); 
   }
 
+  let tagsText = "";
+  activeTags.forEach(tagid => {
+    dbSnapshot.tags.forEach(snaptag => {
+      if(tagid === snaptag.id){
+        tagsText += "<br>"+snaptag.name;
+      }
+    })
+  })
+
+  if(tagsText == ""){
+    $("#result .stats .tags").addClass('hidden');
+  }else{
+    $("#result .stats .tags").removeClass('hidden');
+    tagsText = tagsText.substring(4);
+    $("#result .stats .tags .bottom").html(tagsText); 
+  }
+
   let labels = [];
   for (let i = 1; i <= wpmHistory.length; i++) {
     labels.push(i.toString());
@@ -653,6 +818,8 @@ function showResult(difficultyFailed = false) {
 
   let mainColor = getComputedStyle(document.body).getPropertyValue('--main-color').replace(' ', '');
   let subColor = getComputedStyle(document.body).getPropertyValue('--sub-color').replace(' ', '');
+  let bgColor = getComputedStyle(document.body).getPropertyValue('--bg-color').replace(' ', '');
+
 
   wpmOverTimeChart.options.scales.xAxes[0].ticks.minor.fontColor = subColor;
   wpmOverTimeChart.options.scales.xAxes[0].scaleLabel.fontColor = subColor;
@@ -667,6 +834,11 @@ function showResult(difficultyFailed = false) {
   wpmOverTimeChart.data.datasets[0].data = wpmHistory;
   wpmOverTimeChart.data.datasets[1].borderColor = subColor;
   wpmOverTimeChart.data.datasets[1].data = rawHistory;
+
+  wpmOverTimeChart.options.annotation.annotations[0].borderColor = subColor;
+  wpmOverTimeChart.options.annotation.annotations[0].label.backgroundColor = subColor;
+  wpmOverTimeChart.options.annotation.annotations[0].label.fontColor = bgColor;
+  
 
 
   let maxVal = 0;
@@ -696,7 +868,6 @@ function showResult(difficultyFailed = false) {
 
   wpmOverTimeChart.update({ duration: 0 });
   swapElements($("#words"),$("#result"),250, () => {
-    resultVisible=true;
 
     if(config.blindMode){
       $.each($('#words .word'),(i,word)=>{
@@ -722,7 +893,7 @@ function showResult(difficultyFailed = false) {
   });
 }
 
-function restartTest() {
+function restartTest(withSameWordset = false) {
   clearIntervals();
   time = 0;
   afkDetected = false;
@@ -755,10 +926,10 @@ function restartTest() {
     }, 125, ()=>{
       $("#wordsTitle").slideUp(0);
     });
-    $("#showWordHistoryButton").stop(true,true).animate({
+    $("#resultExtraButtons").stop(true,true).animate({
       opacity: 0
     }, 125, ()=>{
-      $("#showWordHistoryButton").addClass('hidden');
+      $("#resultExtraButtons").addClass('hidden');
     });
   }
   resultVisible = false;
@@ -766,7 +937,21 @@ function restartTest() {
   el.stop(true, true).animate({
     opacity: 0
   }, 125, () => {
-    initWords();
+    if(!withSameWordset){
+      sameWordset = false;
+      initWords();
+    }else{
+      sameWordset = true;
+      testActive = false;
+      currentWordIndex = 0;
+      accuracyStats = {
+        correct: 0,
+        incorrect: 0
+      }
+      inputHistory = [];
+      currentInput = "";
+      showWords();
+    }
     $("#result").addClass('hidden');
     $("#words").css('opacity', 0).removeClass('hidden').stop(true, true).animate({
       opacity: 1
@@ -785,6 +970,8 @@ function restartTest() {
             $("#timer").css("transition", "1s linear");
           });
       }, 250);
+      wpmOverTimeChart.options.annotation.annotations[0].value = "-20";
+      wpmOverTimeChart.update();
 
 
       // let oldHeight = $("#words").height();
@@ -848,6 +1035,7 @@ function changePage(page) {
     showTestConfig();
     hideSignOutButton();
     restartCount = 0;
+    incompleteTestSeconds = 0;
     restartTest();
   } else if (page == "about") {
     pageTransition = true;
@@ -1016,9 +1204,19 @@ function updateAccountLoginButton() {
   }
 }
 
+function accountIconLoading(truefalse) {
+
+  if(truefalse){
+    $("#top #menu .account .icon").html('<i class="fas fa-fw fa-spin fa-circle-notch"></i>');
+  }else{
+    $("#top #menu .account .icon").html('<i class="fas fa-fw fa-user"></i>');
+  }
+
+}
+
 function toggleResultWordsDisplay(){
   if(resultVisible){
-    if($("#words").hasClass('hidden')){
+    if($("#words").stop(true,true).hasClass('hidden')){
       //show 
       $("#wordsTitle").css('opacity',1).removeClass('hidden').slideDown(250);
 
@@ -1059,6 +1257,128 @@ function flipTestColors(tf){
     $("#words").removeClass('flipped');
   }
 }
+
+function applyExtraTestColor(tc){
+  if(tc){
+    $("#words").addClass('extraColor');
+  }else{
+    $("#words").removeClass('extraColor');
+  }
+}
+
+function showEditTags(action,id,name){
+  if(action === "add"){
+    $("#tagsWrapper #tagsEdit").attr('action','add');
+    $("#tagsWrapper #tagsEdit .title").html('Add new tag');
+    $("#tagsWrapper #tagsEdit .button").html(`<i class="fas fa-plus"></i>`);
+    $("#tagsWrapper #tagsEdit input").val('');
+    $("#tagsWrapper #tagsEdit input").removeClass('hidden');
+  }else if(action === "edit"){
+    $("#tagsWrapper #tagsEdit").attr('action','edit');
+    $("#tagsWrapper #tagsEdit").attr('tagid',id);
+    $("#tagsWrapper #tagsEdit .title").html('Edit tag name');
+    $("#tagsWrapper #tagsEdit .button").html(`<i class="fas fa-pen"></i>`);
+    $("#tagsWrapper #tagsEdit input").val(name);
+    $("#tagsWrapper #tagsEdit input").removeClass('hidden');
+  }else if(action === "remove"){
+    $("#tagsWrapper #tagsEdit").attr('action','remove');
+    $("#tagsWrapper #tagsEdit").attr('tagid',id);
+    $("#tagsWrapper #tagsEdit .title").html('Remove tag '+name);
+    $("#tagsWrapper #tagsEdit .button").html(`<i class="fas fa-check"></i>`);
+    $("#tagsWrapper #tagsEdit input").addClass('hidden');
+  }
+  
+  if ($("#tagsWrapper").hasClass("hidden")) {
+    $("#tagsWrapper")
+    .stop(true, true)
+    .css("opacity", 0)
+    .removeClass("hidden")
+    .animate({opacity: 1},100,e=>{
+          $("#tagsWrapper #tagsEdit input").focus();
+        });
+    }
+}
+
+function hideEditTags(){
+  if (!$("#tagsWrapper").hasClass("hidden")) {
+    $("#tagsWrapper #tagsEdit").attr('action','');
+    $("#tagsWrapper #tagsEdit").attr('tagid','');
+    $("#tagsWrapper")
+    .stop(true, true)
+    .css("opacity", 1)
+    .animate(
+        {
+            opacity: 0
+        },100,e => {
+          $("#tagsWrapper").addClass('hidden');
+        });
+    }
+}
+
+$("#tagsWrapper").click(e => {
+  if($(e.target).attr('id') === "tagsWrapper"){
+    hideEditTags();
+  }
+})
+
+$("#tagsWrapper #tagsEdit .button").click(e => {
+  let action = $("#tagsWrapper #tagsEdit").attr('action');
+  let inputVal = $("#tagsWrapper #tagsEdit input").val();
+  let tagid = $("#tagsWrapper #tagsEdit").attr('tagid');
+  hideEditTags();
+  if(action === "add"){
+    addTag({uid:firebase.auth().currentUser.uid,name:inputVal}).then(e => {
+      let status = e.data.status;
+      if(status === 1){
+        showNotification('Tag added',2000);
+        dbSnapshot.tags.push({
+          name: inputVal,
+          id: e.data.id
+        })
+        updateSettingsPage();
+        updateFilterTags();
+      }else if(status === -1){
+        showNotification('Invalid tag name',3000);
+      }else if(status < -1){
+        showNotification('Unknown error',3000);
+      }
+    })
+  }else if(action === "edit"){
+    editTag({uid:firebase.auth().currentUser.uid,name:inputVal,tagid:tagid}).then(e => {
+      let status = e.data.status;
+      if(status === 1){
+        showNotification('Tag updated',2000);
+        dbSnapshot.tags.forEach(tag => {
+          if(tag.id === tagid){
+            tag.name = inputVal;
+          }
+        })
+        updateSettingsPage();
+        updateFilterTags();
+      }else if(status === -1){
+        showNotification('Invalid tag name',3000);
+      }else if(status < -1){
+        showNotification('Unknown error',3000);
+      }
+    })
+  }else if(action === "remove"){
+    removeTag({uid:firebase.auth().currentUser.uid,tagid:tagid}).then(e => {
+      let status = e.data.status;
+      if(status === 1){
+        showNotification('Tag removed',2000);
+        dbSnapshot.tags.forEach((tag,index) => {
+          if(tag.id === tagid){
+            dbSnapshot.tags.splice(index, 1);
+          }
+        })
+        updateSettingsPage();
+        updateFilterTags();
+      }else if(status < -1){
+        showNotification('Unknown error',3000);
+      }
+    })
+  }
+})
 
 
 $(document).on("click", "#top .logo", (e) => {
@@ -1140,6 +1460,9 @@ $(window).on('popstate', (e) => {
 $(document).on("keypress", "#restartTestButton", (event) => {
   if (event.keyCode == 32 || event.keyCode == 13) {
     if (testActive) {
+      let testNow = Date.now();
+      let testSeconds = roundTo2((testNow - testStart) / 1000);
+      incompleteTestSeconds += testSeconds;
       restartCount++;
     }
     restartTest();
@@ -1152,15 +1475,30 @@ $(document.body).on("click", "#restartTestButton", (event) => {
 
 $(document).on("keypress", "#showWordHistoryButton", (event) => {
   if (event.keyCode == 32 || event.keyCode == 13) {
-    if (testActive) {
-      restartCount++;
-    }
     toggleResultWordsDisplay();
   }
 });
 
 $(document.body).on("click", "#showWordHistoryButton", (event) => {
   toggleResultWordsDisplay();
+});
+
+
+
+$(document.body).on("click", "#restartTestButtonWithSameWordset", (event) => {
+  restartTest(true);
+});
+
+$(document).on("keypress", "#restartTestButtonWithSameWordset", (event) => {
+  if (event.keyCode == 32 || event.keyCode == 13) {
+    restartTest(true);
+  }
+});
+
+
+
+$(document.body).on("click", "#copyResultToClipboardButton", (event) => {
+  copyResultToClipboard();
 });
 
 $(document.body).on("click", ".version", (event) => {
@@ -1197,6 +1535,7 @@ $(document).mousemove(function(event) {
 
 //keypresses for the test, using different method to be more responsive
 $(document).keypress(function(event) {
+  event = emulateLayout(event);
   if (!$("#wordsInput").is(":focus")) return;
   if (event["keyCode"] == 13) return;
   if (event["keyCode"] == 32) return;
@@ -1277,6 +1616,9 @@ $(document).keydown((event) => {
     if (config.quickTab && $(".pageTest").hasClass("active")) {
       event.preventDefault();
       if (testActive) {
+        let testNow = Date.now();
+        let testSeconds = roundTo2((testNow - testStart) / 1000);
+        incompleteTestSeconds += testSeconds;
         restartCount++;
       }
       restartTest();
@@ -1368,6 +1710,9 @@ $(document).keydown((event) => {
           return;
         }else if(config.difficulty == "expert" || config.difficulty == "master"){
           showResult(true);
+          let testNow = Date.now();
+          let testSeconds = roundTo2((testNow - testStart) / 1000);
+          incompleteTestSeconds += testSeconds;
           restartCount++;
           return;
         }
@@ -1395,7 +1740,7 @@ if (window.location.hostname === "localhost") {
   };
   $("#top .logo .top").text("localhost");
   $("head title").text($("head title").text() + " (localhost)");
-
+  firebase.functions().useFunctionsEmulator("http://localhost:5001");
 }
 
 $(document).on('mouseenter','#words .word',e =>{
@@ -1460,14 +1805,19 @@ let wpmOverTimeChart = new Chart(ctx, {
         var index = context.dataIndex;
         var value = context.dataset.data[index];
         return value.y <= 0 ? 0 : 3
-      }
+      },
+      pointHoverRadius: function(context) {
+        var index = context.dataIndex;
+        var value = context.dataset.data[index];
+        return value.y <= 0 ? 0 : 5
+      },
     }],
   },
   options: {
     tooltips: {
       titleFontFamily: "Roboto Mono",
       bodyFontFamily: "Roboto Mono",
-      mode: 'x',
+      mode: 'index',
       intersect: false
     },
     legend: {
@@ -1478,15 +1828,17 @@ let wpmOverTimeChart = new Chart(ctx, {
     },
     responsive: true,
     maintainAspectRatio: false,
-    hover: {
-      mode: 'x',
-      intersect: false
-    },
+    // hover: {
+    //   mode: 'x',
+    //   intersect: false
+    // },
     scales: {
 
       xAxes: [{
         ticks: {
-          fontFamily: "Roboto Mono"
+          fontFamily: "Roboto Mono",
+          autoSkip: true,
+          autoSkipPadding: 40
         },
         display: true,
         scaleLabel: {
@@ -1505,7 +1857,10 @@ let wpmOverTimeChart = new Chart(ctx, {
         },
         ticks: {
           fontFamily: 'Roboto Mono',
-          beginAtZero: true
+          beginAtZero: true,
+          min: 0,
+          autoSkip: true,
+          autoSkipPadding: 40
         },
         gridLines: {
           display:false
@@ -1521,7 +1876,10 @@ let wpmOverTimeChart = new Chart(ctx, {
         },
         ticks: {
           fontFamily: 'Roboto Mono',
-          beginAtZero: true
+          beginAtZero: true,
+          min: 0,
+          autoSkip: true,
+          autoSkipPadding: 40
         },
         gridLines: {
           display:false
@@ -1539,13 +1897,60 @@ let wpmOverTimeChart = new Chart(ctx, {
         ticks: {
           precision:0,
           fontFamily: 'Roboto Mono',
-          beginAtZero: true
+          beginAtZero: true,
+          autoSkip: true,
+          autoSkipPadding: 40
         },
         gridLines: {
           display:true
         }
       }
     ]
+    },
+    annotation: {
+      annotations: [{
+        enabled: false,
+        type: 'line',
+        mode: 'horizontal',
+        scaleID: 'wpm',
+        value: '-20',
+        borderColor: 'red',
+        borderWidth: 1,
+        borderDash: [2,2],
+        label: {
+          // Background color of label, default below
+          backgroundColor: 'blue',
+          fontFamily: "Roboto Mono",
+
+          // Font size of text, inherits from global
+          fontSize: 11,
+      
+          // Font style of text, default below
+          fontStyle: "normal",
+      
+          // Font color of text, default below
+          fontColor: "#fff",
+      
+          // Padding of label to add left/right, default below
+          xPadding: 6,
+      
+          // Padding of label to add top/bottom, default below
+          yPadding: 6,
+      
+          // Radius of label rectangle, default below
+          cornerRadius: 3,
+      
+          // Anchor position of label on line, can be one of: top, bottom, left, right, center. Default below.
+          position: "center",
+      
+          // Whether the label is enabled and should be displayed
+          enabled: true,
+      
+          // Text to display in label - default is null. Provide an array to display values on a new line
+          content: "PB",
+
+        },
+      }]
     }
   }
 });

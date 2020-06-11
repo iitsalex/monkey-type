@@ -7,8 +7,51 @@ function updateSettingsPage(){
 
     let langEl = $(".pageSettings .section.languages .buttons").empty();
     Object.keys(words).forEach(language => {
-        langEl.append(`<div class="language" language='${language}'>${language.replace('_', ' ')}</div>`); 
+        langEl.append(`<div class="language" language='${language}'>${language.replace('_', ' ')}</div>`);
     })
+
+    let layoutEl = $(".pageSettings .section.layouts .buttons").empty();
+    Object.keys(layouts).forEach(layout => {
+        layoutEl.append(`<div class="layout button" layout='${layout}'>${layout.replace('_', ' ')}</div>`);
+    });
+
+    if(firebase.auth().currentUser !== null && dbSnapshot !== null){
+        let tagsEl = $(".pageSettings .section.tags .tagsList").empty();
+        dbSnapshot.tags.forEach(tag => {
+            if(activeTags.includes(tag.id)){
+                tagsEl.append(`
+            
+                <div class="tag" id="${tag.id}">
+                    <div class="active" active="true">
+                        <i class="fas fa-check-square"></i>
+                    </div>
+                    <div class="title">${tag.name}</div>
+                    <div class="editButton"><i class="fas fa-pen"></i></div>
+                    <div class="removeButton"><i class="fas fa-trash"></i></div>
+                </div>
+            
+            `);
+            }else{
+                tagsEl.append(`
+            
+                <div class="tag" id="${tag.id}">
+                    <div class="active" active="false">
+                        <i class="fas fa-square"></i>
+                    </div>
+                    <div class="title">${tag.name}</div>
+                    <div class="editButton"><i class="fas fa-pen"></i></div>
+                    <div class="removeButton"><i class="fas fa-trash"></i></div>
+                </div>
+            
+            `);
+            }
+            
+        });
+        $(".pageSettings .section.tags").removeClass('hidden');
+    }else{
+        $(".pageSettings .section.tags").addClass('hidden');
+    }
+    
 
     setSettingsButton('smoothCaret', config.smoothCaret);
     setSettingsButton('quickTab', config.quickTab);
@@ -19,10 +62,13 @@ function updateSettingsPage(){
     setSettingsButton('blindMode', config.blindMode);
     setSettingsButton('quickEnd', config.quickEnd);
     setSettingsButton('flipTestColors', config.flipTestColors);
+    setSettingsButton('discordDot', config.showDiscordDot);
+    setSettingsButton('extraTestColor', config.extraTestColor);
 
 
     setActiveThemeButton();
     setActiveLanguageButton();
+    setActiveLayoutButton();
     setActiveFontSizeButton();
     setActiveDifficultyButton();
     setActiveCaretStyleButton();
@@ -39,6 +85,11 @@ function updateSettingsPage(){
 function setActiveThemeButton() {
     $(`.pageSettings .section.themes .theme`).removeClass('active');
     $(`.pageSettings .section.themes .theme[theme=${config.theme}]`).addClass('active');
+}
+
+function setActiveLayoutButton(){
+    $(`.pageSettings .section.layouts .layout`).removeClass('active');
+    $(`.pageSettings .section.layouts .layout[layout=${config.layout}]`).addClass('active');
 }
 
 function setActiveFontSizeButton() {
@@ -71,6 +122,12 @@ function setSettingsButton(buttonSection,tf) {
     }
 }
 
+function updateActiveTags(){
+    activeTags = [];
+    $.each($('.pageSettings .section.tags .tagsList .tag'), (index, tag) => {
+        if($(tag).children('.active').attr('active') === 'true') activeTags.push($(tag).attr('id'));
+    })
+}
 
 //smooth caret
 $(".pageSettings .section.smoothCaret .buttons .button.on").click(e => {
@@ -160,6 +217,16 @@ $(".pageSettings .section.keyTips .buttons .button.off").click(e => {
     }
 })
 
+//keytips
+$(".pageSettings .section.discordDot .buttons .button.on").click(e => {
+    setDiscordDot(true);
+    setSettingsButton('discordDot', config.showDiscordDot);
+})
+$(".pageSettings .section.discordDot .buttons .button.off").click(e => {
+    setDiscordDot(false);
+    setSettingsButton('discordDot', config.showDiscordDot);
+})
+
 //themes
 // $(document).on("mouseover",".pageSettings .section.themes .theme", (e) => {
 //     let theme = $(e.currentTarget).attr('theme');
@@ -183,6 +250,16 @@ $(document).on("click",".pageSettings .section.languages .language", (e) => {
     showNotification('Language changed', 1000);
     restartTest();
     setActiveLanguageButton();
+})
+
+//layouts
+$(document).on("click",".pageSettings .section.layouts .layout", (e) => {
+    console.log("clicked")
+    let layout = $(e.currentTarget).attr('layout');
+    changeLayout(layout);
+    showNotification('Layout changed', 1000);
+    restartTest();
+    setActiveLayoutButton();
 })
 
 //fontsize
@@ -243,4 +320,46 @@ $(".pageSettings .section.flipTestColors .buttons .button.off").click(e => {
     setFlipTestColors(false);
     showNotification('Flip test colors off', 1000);
     setSettingsButton('flipTestColors', config.flipTestColors);
+})
+
+//extra color
+$(".pageSettings .section.extraTestColor .buttons .button.on").click(e => {
+    setExtraTestColor(true);
+    showNotification('Extra test color on', 1000);
+    setSettingsButton('extraTestColor', config.extraTestColor);
+})
+$(".pageSettings .section.extraTestColor .buttons .button.off").click(e => {
+    setExtraTestColor(false);
+    showNotification('Extra test color off', 1000);
+    setSettingsButton('extraTestColor', config.extraTestColor);
+})
+
+//tags
+$(document).on("click",".pageSettings .section.tags .tagsList .tag .active",e => {
+    let target = e.currentTarget;
+    let tagid = $(target).parent('.tag').attr('id');
+    if($(target).attr('active') === 'true'){
+        $(target).attr('active','false');
+        $(target).html('<i class="fas fa-square"></i>')
+    }else{
+        $(target).attr('active','true');
+        $(target).html('<i class="fas fa-check-square"></i>')
+    }
+    updateActiveTags();
+})
+
+$(document).on("click",".pageSettings .section.tags .addTagButton",e => {
+    showEditTags('add');
+})
+
+$(document).on("click",".pageSettings .section.tags .tagsList .tag .editButton",e => {
+    let tagid = $(e.currentTarget).parent('.tag').attr('id');
+    let name = $(e.currentTarget).siblings('.title').text();
+    showEditTags('edit',tagid,name);
+})
+
+$(document).on("click",".pageSettings .section.tags .tagsList .tag .removeButton",e => {
+    let tagid = $(e.currentTarget).parent('.tag').attr('id');
+    let name = $(e.currentTarget).siblings('.title').text();
+    showEditTags('remove',tagid,name);
 })

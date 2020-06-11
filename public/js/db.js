@@ -2,45 +2,65 @@ const db = firebase.firestore();
 
 let dbSnapshot = null;
 
-function db_testCompleted(obj) {
 
-    if (obj.wpm == 0 || obj.wpm > 350 || obj.acc < 50 || obj.acc > 100) return false;
-
-    let uid = "";
-    let user = firebase.auth().currentUser;
-    if (user) {
-        uid = user.uid;
-    }
-    try{
-    db.collection('results').add(obj);
-    }catch(e){
-        showNotification("Error saving result! Please contact Miodec on Discord.",5000);
-    }
-}
-
-async function db_getUserResults() {
+async function db_getUserSnapshot() {
     let user = firebase.auth().currentUser;
     if (user == null) return false;
-    let ret = [];
-    await db.collection('results')
-        .orderBy('timestamp', 'desc')
-        .where('uid', '==', user.uid)
-        .get()
-        .then(data => {
-            // console.log('getting data from db!');
-            data.docs.forEach(doc => {
-                ret.push(doc.data());
-            })
+    let snap = {
+        results: [],
+        personalBests: {},
+        tags: []
+    };
+    // await db.collection('results')
+    //     .orderBy('timestamp', 'desc')
+    //     .where('uid', '==', user.uid)
+    //     .get()
+    //     .then(data => {
+    //         // console.log('getting data from db!');
+    //         data.docs.forEach(doc => {
+    //             ret.push(doc.data());
+    //         })
+    //     })
+    await db.collection(`users/${user.uid}/results/`)
+    .orderBy('timestamp', 'desc')
+    .get()
+    .then(data => {
+        // console.log('getting data from db!');
+        data.docs.forEach(doc => {
+            let result = doc.data();
+            result.id = doc.id;
+            snap.results.push(result);
         })
-    dbSnapshot = ret;
-    return ret;
+    })
+    await db.collection(`users/${user.uid}/tags/`)
+    .get()
+    .then(data => {
+        // console.log('getting data from db!');
+        data.docs.forEach(doc => {
+            let tag = doc.data();
+            tag.id = doc.id;
+            snap.tags.push(tag);
+        })
+    })
+    await db.collection('users').doc(user.uid)
+    .get()
+    .then(data => {
+        // console.log('getting data from db!');
+        try{
+            snap.personalBests = data.data().personalBests;
+        }catch(e){
+            //
+        }
+    })
+    dbSnapshot = snap;
+    return dbSnapshot;
 }
 
 async function db_getUserHighestWpm(mode, mode2, punctuation, language, difficulty) {
 
     function cont() {   
         let topWpm = 0;
-        dbSnapshot.forEach(result => {
+        dbSnapshot.results.forEach(result => {
             if (result.mode == mode && result.mode2 == mode2 && result.punctuation == punctuation && result.language == language && result.difficulty == difficulty) {
                 if (result.wpm > topWpm) {
                     topWpm = result.wpm;
@@ -52,9 +72,9 @@ async function db_getUserHighestWpm(mode, mode2, punctuation, language, difficul
 
     let retval;
     if (dbSnapshot == null) {
-        await db_getUserResults().then(data => {
-            retval = cont();
-        });
+        // await db_getUserResults().then(data => {
+        //     retval = cont();
+        // });
     } else {
         retval = cont();
     }
@@ -62,50 +82,77 @@ async function db_getUserHighestWpm(mode, mode2, punctuation, language, difficul
 
 }
 
-function db_addEmailToQueue(type, body) {
-
-    let from = 'Annonymous';
-    let subject = '';
-    if (type == 'bug') {
-        subject = 'New Bug Report';
-    } else if (type == 'feature') {
-        subject = 'New Feature Request';
-    } else if (type == 'feedback') {
-        subject = 'New Feedback';
-    } else {
-        showNotification('Error: Unsupported type',3000);
-        return;
-    }
-  
-    if (firebase.auth().currentUser != null) {
-      from = firebase.auth().currentUser.email + ' (' + firebase.auth().currentUser.uid + ')';
-    }
-  
-    // $.get("https://us-central1-monkey-type.cloudfunctions.net/sendEmailNotification",
-    //   {
-    //     subject: "New " + subject,
-    //     body: body
-    // })
-    //   .done(data => {
-    //     if (data == 'Email queued') {
-    //       showNotification("Message sent. Thanks!", 3000);
-    //     } else {
-    //       showNotification("Unknown error", 3000);
-    //     }
-    //   }).fail(error => {
-    //     showNotification("Unexpected error", 3000);
-    //   });
-  
-    db.collection('mail').add({
-        to: "bartnikjack@gmail.com",
-        message: {
-            subject: subject,
-            html: body.replace(/\r\n|\r|\n/g,"<br>") + "<br><br>From: " + from,
+async function db_getLocalPB(mode, mode2, punctuation, language, difficulty){
+    
+    function cont() {   
+        let ret = 0;
+        try{
+            dbSnapshot.personalBests[mode][mode2].forEach(pb => {
+                if( pb.punctuation == punctuation &&
+                    pb.difficulty == difficulty &&
+                    pb.language == language){
+                        ret = pb.wpm;
+                    }
+            })
+            return ret;
+        }catch(e){
+            return ret;
         }
-    }).then(() => {
-        showNotification('Email sent',3000);
-    }).catch((e) => {
-        showNotification('Error while sending email: ' + e,5000);
-    });
-  
-  }
+        
+    }
+
+    let retval;
+    if (dbSnapshot == null) {
+        // await db_getUserResults().then(data => {
+        //     retval = cont();
+        // });
+    } else {
+        retval = cont();
+    }
+    return retval;
+
+}
+
+async function db_saveLocalPB(mode, mode2, punctuation, language, difficulty, wpm){
+    
+    function cont() {   
+        try{
+            let found = false;
+            dbSnapshot.personalBests[mode][mode2].forEach(pb => {
+                if( pb.punctuation == punctuation &&
+                    pb.difficulty == difficulty &&
+                    pb.language == language){
+                        found = true;
+                        pb.wpm = wpm;
+                    }
+            })
+            if(!found){
+                //nothing found
+                dbSnapshot.personalBests[mode][mode2].push({
+                    language: language,
+                    difficulty: difficulty,
+                    punctuation: punctuation,
+                    wpm: wpm
+                })
+            }
+        }catch(e){
+            //that mode or mode2 is not found
+            dbSnapshot.personalBests[mode] = {};
+            dbSnapshot.personalBests[mode][mode2] = [{
+                language: language,
+                difficulty: difficulty,
+                punctuation: punctuation,
+                wpm: wpm
+            }]; 
+        }
+    }
+
+    let retval;
+    if (dbSnapshot == null) {
+        // await db_getUserResults().then(data => {
+        //     retval = cont();
+        // });
+    } else {
+        cont();
+    }
+}

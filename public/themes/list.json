@@ -81,8 +81,8 @@
     },
     {
         "name": "mr_sleeves",
-        "bgColor": "#8fadc9",
-        "textColor": "#daa99b"
+        "bgColor": "linear-gradient(to right, #daa99b, #daa99b 20%, #bdc6ca 20%, #bdc6ca 80%, #8fadc9 80%);",
+        "textColor": "#000"
     },
     {
         "name": "olivia",
@@ -148,5 +148,40 @@
         "name": "terminal",
         "bgColor": "#1b1c1d",
         "textColor": "#79a617"
+    },
+    {
+        "name": "taro",
+        "bgColor": "#b3baff",
+        "textColor": "#130f1a"
+    },
+    {
+        "name": "striker",
+        "bgColor": "#124883",
+        "textColor": "#d6dbd9"
+    },
+    {
+        "name": "gruvbox_dark",
+        "bgColor": "#282828",
+        "textColor": "#ebdbb2"
+    },
+    {
+        "name": "gruvbox_light",
+        "bgColor": "#fbf1c7",
+        "textColor": "#458588"
+    },
+    {
+        "name": "monokai",
+        "bgColor": "#272822",
+        "textColor": "#E6DB74"
+    },
+    {
+        "name": "camping",
+        "bgColor": "#faf1e4",
+        "textColor": "#618c56"
+    },
+    {
+        "name": "voc",
+        "bgColor": "#190618",
+        "textColor": "#e0caac"
     }
 ]

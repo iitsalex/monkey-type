@@ -26,6 +26,20 @@ $(".pageAccount .loadMoreButton").click(e => {
   loadMoreLines();
 })
 
+$(".pageLogin #forgotPasswordButton").click(e => {
+  let email = prompt("Email address");
+  if(email){
+    firebase.auth().sendPasswordResetEmail(email).then(function() {
+      // Email sent.
+      showNotification("Email sent",2000);
+    }).catch(function(error) {
+      // An error happened.
+      showNotification(error.message,5000);
+    });
+  }
+})
+
+
 function showSignOutButton() {
   $(".signOut").removeClass('hidden').css("opacity",1);
 }
@@ -39,66 +53,88 @@ function signIn() {
   let email = $(".pageLogin .login input")[0].value;
   let password = $(".pageLogin .login input")[1].value;
 
-  firebase.auth().signInWithEmailAndPassword(email, password).then(e => {
-    changePage('account');
-  }).catch(function(error) {
-    showNotification(error.message, 5000);
-    $(".pageLogin .preloader").addClass('hidden');
-  });
+  if($(".pageLogin .login #rememberMe input").prop('checked')){
+    //remember me
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function() {
+      return firebase.auth().signInWithEmailAndPassword(email, password).then(e => {
+        changePage('test');
+      }).catch(function(error) {
+        showNotification(error.message, 5000);
+        $(".pageLogin .preloader").addClass('hidden');
+      });
+    })
+  }else{
+    //dont remember
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function() {
+      return firebase.auth().signInWithEmailAndPassword(email, password).then(e => {
+        changePage('test');
+      }).catch(function(error) {
+        showNotification(error.message, 5000);
+        $(".pageLogin .preloader").addClass('hidden');
+      });
+    })
+  }
+
+  
 }
 
 function signUp() {
   $(".pageLogin .preloader").removeClass('hidden');
-  let name = $(".pageLogin .register input")[0].value;
+  let nname = $(".pageLogin .register input")[0].value;
   let email = $(".pageLogin .register input")[1].value;
   let password = $(".pageLogin .register input")[2].value;
   let passwordVerify = $(".pageLogin .register input")[3].value;
 
-  if (name == "") {
-    showNotification("Name is required", 3000);
-    $(".pageLogin .preloader").addClass('hidden');
-    return;
-  }
+  const namecheck = firebase.functions().httpsCallable('checkNameAvailability')
 
-  if (password != passwordVerify) {
-    showNotification("Passwords do not match", 3000);
-    $(".pageLogin .preloader").addClass('hidden');
-    return;
-  }
-
-  firebase.auth().createUserWithEmailAndPassword(email, password).then(user => {
-    // Account has been created here.
-    let usr = user.user;
-    usr.updateProfile({
-      displayName: name
-    }).then(function() {
-      // Update successful.
-      showNotification("Account created", 2000);
-      try{
-        firebase.analytics().logEvent("accountCreated", usr.uid);
-      }catch(e){
-        console.log("Analytics unavailable");
-      }
+  namecheck({name:nname}).then(d => {
+    if(d.data === 0){
+      showNotification("Name unavailable", 3000);
       $(".pageLogin .preloader").addClass('hidden');
-      changePage('account');
-    }).catch(function(error) {
-      // An error happened.
-      usr.delete().then(function() {
-        // User deleted.
-        showNotification("Name invalid", 2000);
-         $(".pageLogin .preloader").addClass('hidden');
+      return;
+    }else if(d.data === 1){
+      if (password != passwordVerify) {
+        showNotification("Passwords do not match", 3000);
+        $(".pageLogin .preloader").addClass('hidden');
+        return;
+      }
+      firebase.auth().createUserWithEmailAndPassword(email, password).then(user => {
+        // Account has been created here.
+        let usr = user.user;
+        usr.updateProfile({
+          displayName: name
+        }).then(function() {
+          // Update successful.
+          showNotification("Account created", 2000);
+          try{
+            firebase.analytics().logEvent("accountCreated", usr.uid);
+          }catch(e){
+            console.log("Analytics unavailable");
+          }
+          $(".pageLogin .preloader").addClass('hidden');
+          changePage('account');
+        }).catch(function(error) {
+          // An error happened.
+          usr.delete().then(function() {
+            // User deleted.
+            showNotification("Name invalid", 2000);
+            $(".pageLogin .preloader").addClass('hidden');
+          }).catch(function(error) {
+            // An error happened.
+            $(".pageLogin .preloader").addClass('hidden');
+          });
+        });
       }).catch(function(error) {
-        // An error happened.
+        // Handle Errors here.
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        showNotification(errorMessage, 5000);
         $(".pageLogin .preloader").addClass('hidden');
       });
-    });
-  }).catch(function(error) {
-    // Handle Errors here.
-    var errorCode = error.code;
-    var errorMessage = error.message;
-    showNotification(errorMessage, 5000);
-    $(".pageLogin .preloader").addClass('hidden');
-  });
+
+    }
+  })
+
 
 
 }
@@ -117,6 +153,13 @@ function signOut() {
 firebase.auth().onAuthStateChanged(function(user) {
   if (user) {
     // User is signed in.
+    updateAccountLoginButton();
+    accountIconLoading(true);
+    db_getUserSnapshot().then(e => {
+      console.log('DB snapshot ready');
+      accountIconLoading(false);
+      updateFilterTags();
+    });
     var displayName = user.displayName;
     var email = user.email;
     var emailVerified = user.emailVerified;
@@ -124,9 +167,10 @@ firebase.auth().onAuthStateChanged(function(user) {
     var isAnonymous = user.isAnonymous;
     var uid = user.uid;
     var providerData = user.providerData;
-    showNotification('Signed in', 2000);
+    // showNotification('Signed in', 1000);
     $(".pageLogin .preloader").addClass('hidden');
-    updateAccountLoginButton();
+    verifyUsername();
+    $("#menu .button.account .text").text(displayName);
   }
 });
 
@@ -267,6 +311,7 @@ Object.keys(words).forEach(language => {
 let activeFilters = ["all"];
 
 
+
 $(document).ready(e =>{
   activeFilters = config.resultFilters;
   // console.log(activeFilters);
@@ -279,6 +324,27 @@ $(document).ready(e =>{
   }
 })
 
+function updateFilterTags(){
+  $(".pageAccount .content .filterButtons .buttons.tags").empty();
+  if(dbSnapshot.tags.length > 0){
+    $(".pageAccount .content .filterButtons .buttonsAndTitle.tags").removeClass('hidden');
+    if(config.resultFilters.includes("tag_all")){
+      $(".pageAccount .content .filterButtons .buttons.tags").append(`<div class="button active" filter="tag_all">all</div>`); 
+    }else{
+      $(".pageAccount .content .filterButtons .buttons.tags").append(`<div class="button" filter="tag_all">all</div>`); 
+    }
+    dbSnapshot.tags.forEach(tag => {
+      if(config.resultFilters.includes("tag_"+tag.name)){
+        $(".pageAccount .content .filterButtons .buttons.tags").append(`<div class="button active" filter="tag_${tag.id}">${tag.name}</div>`); 
+      }else{
+        $(".pageAccount .content .filterButtons .buttons.tags").append(`<div class="button" filter="tag_${tag.id}">${tag.name}</div>`); 
+      }
+    })
+  }else{
+    $(".pageAccount .content .filterButtons .buttonsAndTitle.tags").addClass('hidden');
+  }
+  updateActiveFilters();
+}
 
 function toggleFilterButton(filter){
   const element = $(`.pageAccount .content .filterButtons .button[filter=${filter}]`);
@@ -462,21 +528,23 @@ function refreshAccountPage() {
 
     filteredResults = [];
     $(".pageAccount .history table tbody").empty();
-    dbSnapshot.forEach(result => {
+    dbSnapshot.results.forEach(result => {
 
 
       let tt = 0;
-      if(result.timeDuration == null){
-        //test finished before timeduration field was introduced - estimate
+      if(result.testDuration == undefined){
+        //test finished before testDuration field was introduced - estimate
         if(result.mode == "time"){
           tt = parseFloat(result.mode2);
         }else if(result.mode == "words"){
           tt = (parseFloat(result.mode2)/parseFloat(result.wpm)) * 60;
         }
       }else{
-        tt = parseFloat(result.timeDuration);
+        tt = parseFloat(result.testDuration);
       }
-      if(result.restartCount != null){
+      if(result.incompleteTestSeconds != undefined){
+        tt += result.incompleteTestSeconds;
+      }else if(result.restartCount != undefined && result.restartCount > 0){
         tt += (tt/4) * result.restartCount;
       }
       totalSeconds += tt;
@@ -511,6 +579,19 @@ function refreshAccountPage() {
         puncfilter = "punc_on";
       }
       if(!activeFilters.includes(puncfilter)) return;
+
+      try{
+        if(!activeFilters.includes("tag_all") && dbSnapshot.tags.length > 0){
+          let found = false;
+          result.tags.forEach(tag => {
+            if(activeFilters.includes("tag_"+tag)) found = true;
+          })
+          if(!found) return;
+        }
+      }catch(e){
+        if(!activeFilters.includes("tag_all") && dbSnapshot.tags.length > 0) return;
+      }
+
 
       filteredResults.push(result);
 
@@ -675,13 +756,13 @@ function refreshAccountPage() {
     swapElements($(".pageAccount .preloader"), $(".pageAccount .content"), 250);
   }
 
-  if (dbSnapshot == null) {
+  if (dbSnapshot === null) {
     // console.log('no db snap');
-    db_getUserResults().then(data => {
-      if(!data) return;
-      dbSnapshot = data;
-      cont();
-    })
+    // db_getUserResults().then(data => {
+    //   if(!data) return;
+    //   dbSnapshot = data;
+    //   cont();
+    // })
   } else {
     // console.log('using db snap');
     cont();

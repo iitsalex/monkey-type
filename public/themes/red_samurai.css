@@ -3,7 +3,9 @@
     --main-color: #c79e6e;
     --caret-color: #c79e6e;
     --sub-color: #55131b;
-    --text-color: #c79e6e;
-    --error-color: #da3333;
-    --error-extra-color: #791717;
+    --text-color: #e2dad0;
+    --error-color: #33bbda;
+    --error-extra-color: #176b79;
+    --extra-error-color: #33bbda;
+    --extra-error-extra-color: #176779;
 }

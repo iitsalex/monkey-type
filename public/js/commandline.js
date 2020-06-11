@@ -79,6 +79,13 @@ let commands = {
             }
         },
         {
+            id: "toggleExtraTestColor",
+            display: "Toggle extra test color",
+            exec: () => {
+                toggleExtraTestColor();
+            }
+        },
+        {
             id: "changeDifficulty",
             display: "Change difficulty...",
             subgroup: true,
@@ -111,6 +118,15 @@ let commands = {
             subgroup: true,
             exec: () => {
                 currentCommands.push(commandsLanguages);
+                showCommandLine();
+            }
+        },
+        {
+            id: "changeLayout",
+            display: "Change layout...",
+            subgroup: true,
+            exec: () => {
+                currentCommands.push(commandsLayouts);
                 showCommandLine();
             }
         },
@@ -156,48 +172,9 @@ let commands = {
             exec: () => {
                 window.open("https://discord.gg/yENzqcB")
             }
-        },
-        {
-            id: "sendDevMessage",
-            display: "Send a message ( bug report / feature request / feedback )...",
-            subgroup: true,
-            exec: () => {
-                currentCommands.push(commandsSendDevMessage);
-                showCommandLine();
-            }
         }
     ]
 };
-
-let commandsSendDevMessage = {
-    title: "Send a message...",
-    list: [
-        {
-            id: "sendBugReport",
-            display: "Bug report",
-            input: true,
-            exec: (txt) => {
-                db_addEmailToQueue('bug', txt);
-            }
-        },
-        {
-            id: "sendFeatureRequest",
-            display: "Feature request",
-            input: true,
-            exec: (txt) => {
-                db_addEmailToQueue('feature', txt);
-            }
-        },
-        {
-            id: "sendFeedback",
-            display: "Other feedback",
-            input: true,
-            exec: (txt) => {
-                db_addEmailToQueue('feedback', txt);
-            }
-        }
-    ]
-}
 
 let commandsDifficulty = {
     title: "Change difficulty...",
@@ -466,6 +443,32 @@ if (Object.keys(words).length > 0) {
             display: language.replace('_', ' '),
             exec: () => {
                 changeLanguage(language);
+                restartTest();
+                saveConfigToCookie();
+            }
+        })
+    })
+}
+
+let commandsLayouts = {
+    title: "Change layout...",
+    list: [
+        {
+            id: "couldnotload",
+            display: "Could not load the layouts list :("
+        }
+    ]
+};
+
+
+if (Object.keys(layouts).length > 0) {
+    commandsLayouts.list = [];
+    Object.keys(layouts).forEach(layout => {
+        commandsLayouts.list.push({
+            id: "changeLayout" + capitalizeFirstLetter(layout),
+            display: layout.replace('_', ' '),
+            exec: () => {
+                changeLayout(layout);
                 restartTest();
                 saveConfigToCookie();
             }

@@ -14,7 +14,7 @@ input{
   border: none;
   border-radius: var(--roundness);
   background: rgba(0,0,0,.1);
-  color: var(--main-color);
+  color: var(--text-color);
   padding: .5rem;
   font-size: 1rem;
   line-height: 1rem;
@@ -31,6 +31,28 @@ body {
 }
 
 html { overflow-y: scroll; }
+
+/* width */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: var(--sub-color);
+  transition: .25s;
+  border-radius: 2px !important;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--main-color);
+}
 
 a {
   color: var(--sub-color);
@@ -52,6 +74,54 @@ a:hover {
   transform: translateX(-50%);
   top: -5rem;
 }
+
+
+#tagsWrapper{
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  display: grid;
+  justify-content: center;
+  align-items: center;
+  padding: 5rem 0;
+  #tagsEdit{
+    background: var(--bg-color);
+    border-radius: var(--roundness);
+    padding: 2rem;
+    display: grid;
+    gap: 1rem;
+    overflow-y: scroll;
+    .button{
+      color: var(--text-color);
+      cursor: pointer;
+      transition: .25s;
+      padding: .2rem .5rem;
+      border-radius: var(--roundness);
+
+      background: rgba(0,0,0,.1);
+      text-align: center;
+      -webkit-user-select: none;
+      display: grid;
+      align-content: center;
+      height: min-content;
+      height: -moz-min-content;
+      &.active{
+        background: var(--main-color);
+        color: var(--bg-color);
+      }
+      &:hover,&:focus{
+        color: var(--bg-color);
+        background: var(--main-color);
+        outline: none;
+      }
+    }
+  }
+}
+
 
 #versionHistoryWrapper{
   width: 100%;
@@ -98,6 +168,7 @@ a:hover {
         }
         .body{
           grid-area: body;
+          color: var(--text-color);
         }
         &:last-child{
           margin-bottom: 2rem;
@@ -388,6 +459,10 @@ a:hover {
         right: .25rem;
         border: 2px solid var(--bg-color);
       }
+      &.dotHidden::after{
+        background: transparent;
+        border-color: transparent;
+      }
     }
     &:focus{
       background: var(--sub-color);
@@ -417,9 +492,10 @@ a:hover {
 }
 
 #menu .button .text {
-  width: 0;
-  overflow: hidden;
-  /*   transition: .25s; */
+  font-size: .65rem;
+  line-height: .65rem;
+  align-self: center;
+  margin-left: .25rem;
 }
 
 /* #menu .button:hover .text{
@@ -598,7 +674,7 @@ key {
   font-size: 0.75rem;
   color: var(--sub-color);
   transition: 0.5s;
-  margin-bottom: 2rem;
+  // margin-bottom: 2rem;
   .keyTips{
     margin-bottom: 1rem;
   }
@@ -658,7 +734,8 @@ key {
                          "wpm acc"
                          "wpm key" 
                          "raw time"
-                         "testType info";
+                         "testType info"
+                         "tags info";
     .group{
       .top{
         color: var(--sub-color);
@@ -687,6 +764,19 @@ key {
     .info{
       align-self: baseline;
       grid-area: info;
+      color: var(--sub-color);
+      .top{
+        font-size: 1rem;
+        line-height: 1.25rem;
+      }
+      .bottom{
+        font-size: 1rem;
+        line-height: 1rem;
+      }
+    }
+    .tags{
+      align-self: baseline;
+      grid-area: tags;
       color: var(--sub-color);
       .top{
         font-size: 1rem;
@@ -778,11 +868,52 @@ key {
   }
 }
 
-#restartTestButton, #showWordHistoryButton {
-  position: relative;
+#words.extraColor{
+  .word{
+    & letter.correct{
+      color: var(--main-color);
+    }
+    & letter.incorrect{
+      color: var(--extra-error-color);
+    }
+    & letter.incorrect.extra{
+      color: var(--extra-error-extra-color);
+    }
+  }
+}
+
+#words.flipped.extraColor{
+  .word{
+    color: var(--main-color);
+    & letter.correct{
+      color: var(--sub-color);
+    }
+    & letter.incorrect{
+      color: var(--extra-error-color);
+    }
+    & letter.incorrect.extra{
+      color: var(--extra-error-extra-color);
+    }
+  }
+}
+
+#words.flipped.extraColor .word.error,
+#words.extraColor .word.error
+{
+  border-bottom: 2px solid var(--extra-error-color);
+}
+
+.pageTest #resultExtraButtons{
   opacity: 0;
+  display: grid;
+  grid-auto-flow: column;
+  gap: 1rem;
+}
+
+#restartTestButton, #showWordHistoryButton, #copyResultToClipboardButton, #restartTestButtonWithSameWordset { 
+  position: relative;
   border-radius: var(--roundness);
-  padding: 1rem 5rem;
+  padding: 1rem 2rem;
   width: min-content;
   width: -moz-min-content;
   color: var(--sub-color);
@@ -917,34 +1048,93 @@ key {
 
 .pageLogin{
   display: flex;
-  grid-auto-flow: column;
-  gap: 1rem;
+  grid-auto-flow: column;  gap: 1rem;
   justify-content: space-around;
   align-items: center;
   .side{
     display: grid;
     gap: .5rem;
     justify-content: center;
+    &.login{
+      grid-template-areas: "title forgotButton"
+                              "form form";
+      .title{
+        grid-area: title;
+      }
+      #forgotPasswordButton{
+        grid-area: forgotButton;
+        font-size: .5rem;
+        line-height: .5rem;
+        height: fit-content;
+        align-self: center;
+        justify-self: right;
+        padding: .25rem 0;
+        color: var(--sub-color);
+        cursor: pointer;
+        transition: .25s;
+        &:hover{
+          color: var(--main-color);
+        }
+      }
+      form{
+        grid-area: form;
+        #rememberMe{
+          color: var(--sub-color);
+          -moz-user-select: none;
+          user-select: none;
+          cursor: pointer;
+          input{
+            margin: 0 !important;
+            cursor: pointer;
+            width: 0;
+            height: 0;
+            & ~ .customCheckbox{
+              width: 12px;
+              height: 12px;
+              background: rgba(0,0,0,.1);
+              border-radius: 2px;
+              box-shadow: 0 0 0 4px rgba(0,0,0,.1);
+              display: inline-block;
+              margin: 0 .5rem 0 .25rem;
+              transition: .25s;
+            }
+            &:checked ~ .customCheckbox{
+              background: var(--main-color);
+            }
+          }
+        }
+      }
+    }
   }
   form{
     display: grid;
     gap: .5rem;
     width: 100%;
     .button{
-      border-radius: var(--roundness);
-      background: var(--sub-color);
-      color: var(--bg-color);
-      padding: .5rem;
-      font-size: 1rem;
-      line-height: 1rem;
-      text-align: center;
+      color: var(--text-color);
       cursor: pointer;
       transition: .25s;
-      &:hover{
-        background: var(--main-color);
-      }
-      .fas{
+      padding: .2rem .5rem;
+      border-radius: var(--roundness);
+
+      background: rgba(0,0,0,.1);
+      text-align: center;
+      -webkit-user-select: none;
+      // display: grid;
+      align-content: center;
+      height: min-content;
+      height: -moz-min-content;
+      i{
         margin-right: .5rem;
+      }
+      &.active{
+        background: var(--main-color);
+        color: var(--bg-color);
+      }
+      &:hover,&:focus{
+        color: var(--bg-color);
+        background: var(--main-color);
+        outline: none;
       }
     }
   }
@@ -987,12 +1177,21 @@ key {
   .tip{
     color: var(--sub-color);
   }
+  .sectionGroupTitle{
+    font-size: 1.5rem;
+    color: var(--sub-color);
+    line-height: 1.5rem;
+  }
+  .sectionSpacer{
+    height: 1.5rem;
+  }
   .section{
     display: grid;
     // gap: .5rem;
     grid-template-areas: "title title"
                           "text buttons";
     grid-template-columns: 2fr 1fr;
+    column-gap: 2rem;
     align-items: center;
     h1{
       font-size: 1rem;
@@ -1006,10 +1205,10 @@ key {
       grid-area: text;
     }
     .text{
+      align-self: normal;
       color: var(--text-color);
     }
     .buttons{
-      margin-left: 2rem;
       display: grid;
       grid-auto-flow: column;
       grid-auto-columns: 1fr;
@@ -1040,10 +1239,69 @@ key {
         }
       }
     }
+    &.tags{
+      .tagsList{
+        display: grid;
+        gap: .5rem;
+        .tag{
+          display: grid;
+          display: grid;
+          grid-template-columns: auto 1fr auto auto;
+          color: var(--text-color);
+          .title{
+            align-self: center;
+          }
+          .editButton, .removeButton, .active{
+            display: grid;
+            grid-auto-flow: column;
+            align-content: center;
+            transition: 0.25s;
+            padding: 0 0.5rem;
+            border-radius: var(--roundness);
+            color: var(--sub-color);
+            &:focus{
+              background: var(--sub-color);
+              color: var(--main-color);
+              border: none;
+              outline: none;
+            }
+            &:hover{
+              cursor: pointer;
+              color: var(--main-color);
+            }
+          }
+        }
+      }
+      .addTagButton{
+        margin-top: .5rem;
+        color: var(--text-color);
+        cursor: pointer;
+        transition: .25s;
+        padding: .2rem .5rem;
+        border-radius: var(--roundness);
+
+        background: rgba(0,0,0,.1);
+        text-align: center;
+        -webkit-user-select: none;
+        display: grid;
+        align-content: center;
+        height: min-content;
+        height: -moz-min-content;
+        &.active{
+          background: var(--main-color);
+          color: var(--bg-color);
+        }
+        &:hover,&:focus{
+          color: var(--bg-color);
+          background: var(--main-color);
+          outline: none;
+        }
+      }
+    }
     &.fontSize .buttons{
       grid-template-columns: 1fr 1fr 1fr 1fr;
     }
-    &.themes, &.languages{
+    &.themes, &.languages, &.layouts{
       grid-template-columns: 1fr;
       grid-template-areas: "title"
                             "buttons";
@@ -1054,7 +1312,7 @@ key {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr 1fr;
         gap: .5rem;
-        .theme, .language{
+        .theme, .language, .layout{
           color: var(--text-color);
           cursor: pointer;
           transition: .25s;
@@ -1078,6 +1336,10 @@ key {
       }
     }
   }
+}
+
+.buttons div.theme:hover{
+  transform: scale(1.1);
 }
 
 .signOut{
@@ -1226,7 +1488,7 @@ key {
           background: var(--main-color);
         }
       }
-      &.languages{
+      &.languages, &.layouts{
         grid-template-columns: repeat(4,1fr);
         grid-auto-flow: unset;
       }

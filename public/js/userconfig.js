@@ -1,4 +1,4 @@
-let config = {
+let defaultConfig = {
     theme: 'serika_dark',
     showKeyTips: true,
     showLiveWpm: false,
@@ -17,8 +17,12 @@ let config = {
     blindMode: false,
     quickEnd: false,
     caretStyle: "default",
-    flipTestColors: false
+    flipTestColors: false,
+    layout:"default",
+    showDiscordDot: true
 }
+
+let config = defaultConfig;
 
 //cookies
 function saveConfigToCookie() {
@@ -44,6 +48,7 @@ function loadConfigFromCookie() {
         changeWordCount(newConfig.words,true);
         changeMode(newConfig.mode,true);
         changeLanguage(newConfig.language,true);
+        changeLayout(newConfig.layout, true);
         changeFontSize(newConfig.fontSize,true);
         setFreedomMode(newConfig.freedomMode,true);
         setCaretStyle(newConfig.caretStyle,true);
@@ -51,19 +56,19 @@ function loadConfigFromCookie() {
         setBlindMode(newConfig.blindMode,true);
         setQuickEnd(newConfig.quickEnd,true);
         setFlipTestColors(newConfig.flipTestColors,true);
+        setDiscordDot(newConfig.hideDiscordDot,true);
+        setExtraTestColor(newConfig.extraTestColor,true);
         if(newConfig.resultFilters == null || newConfig.resultFilters == undefined){
             newConfig.resultFilters = ["all"];
         }
         config = newConfig;
     }
-    if(config.difficulty == undefined){
-        config.difficulty = "normal";
-        saveConfigToCookie();
-    }
-    if(config.blindMode == undefined){
-        config.blindMode = false;
-        saveConfigToCookie();
-    }
+    Object.keys(defaultConfig).forEach(configKey => {
+        if(config[configKey] == undefined){
+            config[configKey] = defaultConfig[configKey];
+        }
+    })
+    saveConfigToCookie();
 }
 
 function showTestConfig() {
@@ -81,6 +86,34 @@ function setDifficulty(diff, nosave){
     }
     config.difficulty = diff;
     restartTest();
+    if(!nosave) saveConfigToCookie();
+}
+
+//blind mode
+function toggleDiscordDot(){
+    dot = !config.showDiscordDot;
+    if(dot == undefined){
+        dot = false;
+    }
+    config.showDiscordDot = dot;
+    if(!dot){
+        $("#menu .discord").addClass('dotHidden');
+    }else{
+        $("#menu .discord").removeClass('dotHidden');
+    }
+    saveConfigToCookie();
+}
+
+function setDiscordDot(dot, nosave){
+    if(dot == undefined){
+        dot = false;
+    }
+    config.showDiscordDot = dot;
+    if(!dot){
+        $("#menu .discord").addClass('dotHidden');
+    }else{
+        $("#menu .discord").removeClass('dotHidden');
+    }
     if(!nosave) saveConfigToCookie();
 }
 
@@ -134,6 +167,22 @@ function setFlipTestColors(flip,nosave){
 function toggleFlipTestColors(){
     config.flipTestColors = !config.flipTestColors;
     flipTestColors(config.flipTestColors);
+    saveConfigToCookie();
+}
+
+//extra color
+function setExtraTestColor(extra,nosave){
+    if(extra == undefined){
+        extra = false;
+    }
+    config.extraTestColor = extra;
+    applyExtraTestColor(extra);
+    if(!nosave) saveConfigToCookie();
+}
+
+function toggleExtraTestColor(){
+    config.extraTestColor = !config.extraTestColor;
+    applyExtraTestColor(config.extraTestColor);
     saveConfigToCookie();
 }
 
@@ -294,7 +343,9 @@ function previewTheme(name) {
 function setTheme(name,nosave) {
     config.theme = name;
     $("#currentTheme").attr("href", `themes/${name}.css`);
-    updateFavicon(32,14);
+    setTimeout(() => {
+      updateFavicon(32,14);
+    }, 500);
     try{
         firebase.analytics().logEvent('changedTheme', {
             theme: name
@@ -353,6 +404,14 @@ function changeLanguage(language, nosave) {
     }catch(e){
         console.log("Analytics unavailable");
     }
+    if(!nosave) saveConfigToCookie();
+}
+
+function changeLayout(layout, nosave){
+    if (layout == null || layout == undefined){
+        layout = "qwerty"
+    }
+    config.layout = layout;
     if(!nosave) saveConfigToCookie();
 }
 
