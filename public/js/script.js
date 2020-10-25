@@ -42,7 +42,7 @@ let lastSecondNotRound = false;
 let paceCaret = null;
 let missedWords = [];
 let verifyUserWhenLoggedIn = null;
-let modeBeforePractise = null;
+let modeBeforePractice = null;
 let memoryFunboxTimer = null;
 let memoryFunboxInterval = null;
 
@@ -2649,10 +2649,10 @@ function restartTest(withSameWordset = false, nosave = false) {
     }
   }
 
-  if (modeBeforePractise !== null && !withSameWordset) {
+  if (modeBeforePractice !== null && !withSameWordset) {
     showNotification("Reverting to previous settings.", 1500);
-    changeMode(modeBeforePractise);
-    modeBeforePractise = null;
+    changeMode(modeBeforePractice);
+    modeBeforePractice = null;
   }
 
   manualRestart = false;
@@ -4293,7 +4293,7 @@ $(document.body).on("click", "#restartTestButton", (event) => {
   restartTest();
 });
 
-$(document).on("keypress", "#practiseMissedWordsButton", (event) => {
+$(document).on("keypress", "#practiceMissedWordsButton", (event) => {
   if (event.keyCode == 13) {
     if (Object.keys(missedWords).length > 0) {
       let currentMode = config.mode;
@@ -4308,14 +4308,14 @@ $(document).on("keypress", "#practiseMissedWordsButton", (event) => {
       customTextIsRandom = true;
       customTextWordCount = 50;
       restartTest();
-      modeBeforePractise = currentMode;
+      modeBeforePractice = currentMode;
     } else {
       showNotification("You haven't missed any words.", 2000);
     }
   }
 });
 
-$(document.body).on("click", "#practiseMissedWordsButton", (event) => {
+$(document.body).on("click", "#practiceMissedWordsButton", (event) => {
   if (Object.keys(missedWords).length > 0) {
     let currentMode = config.mode;
     changeMode("custom");
@@ -4329,7 +4329,7 @@ $(document.body).on("click", "#practiseMissedWordsButton", (event) => {
     customTextIsRandom = true;
     customTextWordCount = 50;
     restartTest();
-    modeBeforePractise = currentMode;
+    modeBeforePractice = currentMode;
   } else {
     showNotification("You haven't missed any words.", 2000);
   }
